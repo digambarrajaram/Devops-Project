@@ -3,6 +3,7 @@
   become: true # Run tasks with sudo privileges
   vars:
     java_version: java-17-amazon-corretto-devel # Or another suitable Java version
+
   tasks:
     - name: Update system packages
       yum:
@@ -54,6 +55,31 @@
         name: ec2-user
         groups: docker
         append: yes
+
+    - name: Install unzip and other dependencies
+      ansible.builtin.yum:
+        name: unzip
+        state: present
+
+    - name: Download AWS CLI v2 installer
+      ansible.builtin.get_url:
+        url: "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        dest: "/tmp/awscliv2.zip"
+
+    - name: Unzip AWS CLI installer
+      ansible.builtin.unarchive:
+        src: "/tmp/awscliv2.zip"
+        dest: "/tmp/"
+        remote_src: yes
+
+    - name: Install AWS CLI v2
+      ansible.builtin.command: "/tmp/aws/install"
+      args:
+        creates: "/usr/local/bin/aws" # Prevents re-running if already installed
+
+    - name: Restart Jenkins safely
+      shell: |
+        java -jar {{ jenkins_cli_jar }} -s {{ jenkins_url }} -auth {{ jenkins_user }}:{{ jenkins_token }} safe-restart
 
     - name: Run a command and capture output
       ansible.builtin.command:
