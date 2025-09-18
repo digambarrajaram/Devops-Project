@@ -7,7 +7,7 @@ pipeline {
     AWS_DEFAULT_REGION    = 'ap-south-1'
     TF_BUCKET             = 'backend-terraform-state-bucket-for-vpc-and-eks'           // Replace with your S3 bucket
     TF_KEY                = 'eks/vpc/terraform.tfstate'
-    TF_DYNAMODB_TABLE     = 'terraform-lock'
+    TF_DYNAMODB_TABLE     = 'terraform-lock' 
   }
 
   stages {
