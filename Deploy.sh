@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 HOST="$1"
 KNOWN_HOSTS="$HOME/.ssh/known_hosts"
