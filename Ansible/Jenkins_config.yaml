@@ -1,0 +1,65 @@
+---
+- hosts: jenkins # Replace with your instance's IP or hostname
+  become: true # Run tasks with sudo privileges
+  vars:
+    java_version: java-17-amazon-corretto-devel # Or another suitable Java version
+  tasks:
+    - name: Update system packages
+      yum:
+        name: "*"
+        state: latest
+        update_cache: yes
+
+    - name: Install Java
+      yum:
+        name: "{{ java_version }}"
+        state: present
+
+    - name: Download Jenkins repository file
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+
+    - name: Import Jenkins-CI key
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+
+    - name: Install Jenkins
+      yum:
+        name: jenkins
+        state: present
+
+    - name: Start Jenkins service
+      service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Install Git, and Docker
+      ansible.builtin.yum:
+        name:
+          - git
+          - docker
+        state: present
+
+    - name: Start and enable Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to Docker group
+      ansible.builtin.user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Run a command and capture output
+      ansible.builtin.command:
+        cmd: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: initialAdminPassword
+
+    - name: Display initial Admin Password output
+      debug:
+        var: initialAdminPassword.stdout
