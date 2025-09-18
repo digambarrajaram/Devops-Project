@@ -14,6 +14,29 @@ resource "aws_instance" "instance"  {
     Name = "Jenkins"
   }
 }
+
+resource "aws_s3_bucket" "s3_bucket" {
+  bucket = "backend-terraform-state-bucket-for-vpc-and-eks"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_versioning" "version" {
+  bucket = "backend-terraform-state-bucket-for-vpc-and-eks"
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_dynamodb_table" "dynamodb_table" {
+  name     = "terraform-state-lock-table"
+  hash_key = "LockID"
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+  billing_mode = "PAY_PER_REQUEST"
+}
+
 output "jenkins_ip" {
   value = aws_instance.instance.public_ip
 }
@@ -21,4 +44,11 @@ output "jenkins_ip" {
 output "id" {
   value = aws_instance.instance.id
 }
+
+output "bucket_name" {
+  value = aws_s3_bucket.s3_bucket.bucket
+}
+
+
+
 
