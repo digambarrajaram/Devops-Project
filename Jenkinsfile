@@ -12,32 +12,28 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                 git branch: 'main', url: 'https://github.com/digambarrajaram/Devops-Project.git'
-                  }
-
+                git branch: 'main', url: 'https://github.com/digambarrajaram/Devops-Project.git'
+            }
         }
 
         stage('Build Docker Image') {
-                    steps {
-                        script {
-                            dir('Docker-files/app/multistage') {
-                                withAWS(credentials: 'awscreds', region: "${AWS_REGION}") {
-                                    sh """
-                                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${APP_REPO}
-                                        docker build -t ${APP_REPO}:${IMAGE_TAG} .
-                                    """
-                                }
-                            }
+            steps {
+                script {
+                    dir('Docker-files/app/multistage') {
+                        withAWS(credentials: 'awscreds', region: "${AWS_DEFAULT_REGION}") {
+                            sh """
+                                aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}
+                                docker build -t ${ECR_REPO}:${IMAGE_TAG} .
+                            """
                         }
                     }
                 }
-
+            }
+        }
 
         stage('Push to ECR') {
             steps {
-                dir(APP_DIR) {
-                    sh "docker push $ECR_REPO:$IMAGE_TAG"
-                }
+                sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
             }
         }
 
@@ -46,7 +42,7 @@ pipeline {
                 script {
                     dir(APP_DIR) {
                         sh """
-                            kubectl set image deployment/flask-app flask-container=$ECR_REPO:$IMAGE_TAG --record || \
+                            kubectl set image deployment/flask-app flask-container=${ECR_REPO}:${IMAGE_TAG} --record || \
                             kubectl apply -f k8s-deployment.yaml
                             kubectl apply -f k8s-service.yaml
                         """
