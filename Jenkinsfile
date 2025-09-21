@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        registryCredential = 'ecr:ap-south-1:awscred'
         AWS_DEFAULT_REGION = "ap-south-1"
         ECR_REPO = "605134452604.dkr.ecr.ap-south-1.amazonaws.com/application_docker_repo"
         IMAGE_TAG = "latest"
@@ -17,19 +18,19 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            steps {
-                script {
-                    dir(APP_DIR) {
-                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                            sh """
-                                aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                                docker build -t $ECR_REPO:$IMAGE_TAG .
-                            """
+                    steps {
+                        script {
+                            dir('Docker-files/app/multistage') {
+                                withAWS(credentials: 'awscreds', region: "${AWS_REGION}") {
+                                    sh """
+                                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${APP_REPO}
+                                        docker build -t ${APP_REPO}:${IMAGE_TAG} .
+                                    """
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
 
 
         stage('Push to ECR') {
