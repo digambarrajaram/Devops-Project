@@ -11,8 +11,9 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/digambarrajaram/Devops-Project.git'
-            }
+                 git branch: 'main', url: 'https://github.com/digambarrajaram/Devops-Project.git'
+                  }
+
         }
 
         stage('Build Docker Image') {
