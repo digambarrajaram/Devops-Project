@@ -20,14 +20,17 @@ pipeline {
             steps {
                 script {
                     dir(APP_DIR) {
-                        sh """
-                            aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                            docker build -t $ECR_REPO:$IMAGE_TAG .
-                        """
+                        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
+                            sh """
+                                aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                                docker build -t $ECR_REPO:$IMAGE_TAG .
+                            """
+                        }
                     }
                 }
             }
         }
+
 
         stage('Push to ECR') {
             steps {
