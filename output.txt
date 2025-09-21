@@ -1,0 +1,9 @@
+JENKINS_IP : 13.233.215.78
+Bucket_Name : backend-terraform-state-bucket-for-vpc-and-eks
+EKS Cluster Name: 
+EKS Cluster ARN: 
+VPC ID: 
+Jenkins Password: 
+ecr_repo_name: 
+ecr_repo_url: 
+ecr_repo_arn: 

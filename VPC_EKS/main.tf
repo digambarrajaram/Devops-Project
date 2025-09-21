@@ -20,3 +20,7 @@ module "eks" {
   depends_on = [ module.vpc ]
   eks_cluster_name = var.eks_cluster_name
 }
+
+module "ecr"{
+  source = "./Modules/ECR"
+}

@@ -1,0 +1,50 @@
+{
+  "eks_cluster_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:eks:ap-south-1:605134452604:cluster/eks-cluster"
+  },
+  "eks_cluster_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "eks-cluster"
+  },
+  "endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://A3B92F5CFBBB7AEB1DBDB61063688B32.gr7.ap-south-1.eks.amazonaws.com"
+  },
+  "private_subnet_id": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-01c268e4b80e249f0",
+      "subnet-09ead78095176adaf"
+    ]
+  },
+  "public_subnet_id": {
+    "sensitive": false,
+    "type": [
+      "tuple",
+      [
+        "string",
+        "string"
+      ]
+    ],
+    "value": [
+      "subnet-017fe4030dc49ce40",
+      "subnet-0cacaf36aeb8a48d5"
+    ]
+  },
+  "vpc_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "vpc-0c06ed12bd9ae58a4"
+  }
+}

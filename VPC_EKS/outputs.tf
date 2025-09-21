@@ -25,3 +25,17 @@ output "endpoint" {
   description = "The endpoint of the EKS cluster"
 }
 
+output "ecr_repo_url"{
+  value = module.ecr.ecr_repo_url
+}
+
+output "ecr_repo_arn" {
+  value       = module.ecr.ecr_repo_arn
+  description = "The ARN of the ECR repository"
+}
+
+output "ecr_repo_name" {
+  description = "The name of the ECR repository"
+  value = module.ecr.ecr_repo_name
+}
+

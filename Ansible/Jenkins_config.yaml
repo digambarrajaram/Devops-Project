@@ -79,13 +79,13 @@
 
     - name: Restart Jenkins safely
       shell: |
-        java -jar {{ jenkins_cli_jar }} -s {{ jenkins_url }} -auth {{ jenkins_user }}:{{ jenkins_token }} safe-restart
+        systemctl restart jenkins
 
     - name: Run a command and capture output
       ansible.builtin.command:
         cmd: cat /var/lib/jenkins/secrets/initialAdminPassword
       register: initialAdminPassword
 
-    - name: Display initial Admin Password output
+    - name: Print password for shell capture
       debug:
-        var: initialAdminPassword.stdout
+        msg: "JENKINS_PASSWORD={{ initialAdminPassword.stdout }}"
