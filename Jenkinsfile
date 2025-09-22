@@ -63,7 +63,7 @@ pipeline {
                         sh "kubectl apply -f ${KUBE_DEPLOYMENT} -n ${namespace}"
 
                         // Apply the service directly. `kubectl apply` handles type changes.
-                        sh "kubectl apply -f ClusterIp -n ${namespace}"
+                        sh "kubectl apply -f ClusterIP -n ${namespace}"
 
                         // Apply ingress dynamically
                         sh "kubectl apply -f ${KUBE_INGRESS} -n ${namespace}"
