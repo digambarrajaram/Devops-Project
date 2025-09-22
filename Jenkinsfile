@@ -1,6 +1,8 @@
 pipeline {
     agent any
-
+        docker {
+                image 'python:3.9-slim'
+            }
     environment {
         AWS_DEFAULT_REGION = "ap-south-1"
         ECR_REPO = "application_docker_repo"
@@ -41,7 +43,7 @@ pipeline {
             steps {
                 script {
                     docker.image("${IMAGE_URI}").push()
-                } 
+                }
             }
         }
     }
