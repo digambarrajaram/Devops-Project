@@ -6,3 +6,4 @@ Terraform/terraform.tfstate
 Terraform/terraform.tfstate.backup
 awscliv2.zip
 
+.env
