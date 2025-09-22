@@ -65,12 +65,7 @@ pipeline {
                         SVC_NAME=$(yq eval '.metadata.name' $KUBE_SERVICE)
                         SVC_TYPE=$(yq eval '.spec.type' $KUBE_SERVICE)
                         kubectl apply -f $KUBE_SERVICE -n $NAMESPACE
-                        echo "Service name: $SVC_NAME"
-                        echo "Namespace: $NAMESPACE"
-                        echo "Service type from YAML: $SVC_TYPE"
-
-                        kubectl patch svc "$SVC_NAME" -n "$NAMESPACE" --type='merge' -p "{\"spec\":{\"type\":\"$SVC_TYPE\"}}"
-
+                        kubectl patch svc "$SVC_NAME" -n "$NAMESPACE" --type=merge -p "{\"spec\":{\"type\":\"$SVC_TYPE\"}}"
                         # Apply ingress dynamically
                         kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
 
