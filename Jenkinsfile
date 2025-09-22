@@ -45,18 +45,45 @@ pipeline {
             }
         }
 
-      stage('Deploy to Kubernetes') {
-                steps {
-                    echo "Applying Kubernetes manifests..."
-                    sh "kubectl apply -f python-app/k8s-deployment.yaml"
-                    sh "kubectl apply -f python-app/k8s-service.yaml"
-                    sh "kubectl apply -f python-app/k8s-ingress.yaml"
+      stage('Deploy to EKS') {
+          steps {
+              withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
+                  script {
+                      // Update kubeconfig using AWS CLI within the withCredentials context
+                      sh "aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name eks-cluster"
 
-                    // You can add a rollout status check to wait for deployment completion
-                    sh "kubectl rollout status deployment/your-app-deployment"
-                }
-            }
-        }
+                      // Use a different sh block for kubectl commands, now that kubeconfig is updated
+                      sh '''
+                          # Extract namespace from deployment YAML
+                          NAMESPACE=$(yq e '.metadata.namespace' $KUBE_DEPLOYMENT)
+                          [ -z "$NAMESPACE" ] && NAMESPACE="default"
+                          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+
+                          # Update deployment image dynamically
+                          yq e -i ".spec.template.spec.containers[0].image = \"$IMAGE_URI\"" $KUBE_DEPLOYMENT
+                          kubectl apply -f $KUBE_DEPLOYMENT -n $NAMESPACE
+
+                          # Extract service name and type from YAML dynamically
+                          SVC_NAME=$(yq e '.metadata.name' $KUBE_SERVICE)
+                          SVC_TYPE=$(yq e '.spec.type' $KUBE_SERVICE)
+                          echo "Service name: $SVC_NAME"
+                          echo "Namespace: $NAMESPACE"
+                          echo "Service type from YAML: $SVC_TYPE"
+
+                          kubectl apply -f "$KUBE_SERVICE" -n "$NAMESPACE"
+
+                          # Apply ingress dynamically
+                          kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
+
+                          # Wait for deployment rollout
+                          DEPLOY_NAME=$(yq e '.metadata.name' $KUBE_DEPLOYMENT)
+                          kubectl rollout status deployment/$DEPLOY_NAME -n $NAMESPACE
+                      '''
+                  }
+              }
+          }
+      }
+
         post {
             always {
                 echo "Pipeline completed."
