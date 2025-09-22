@@ -64,8 +64,20 @@ pipeline {
                         # Extract service name and type from YAML dynamically
                         SVC_NAME=$(yq eval '.metadata.name' $KUBE_SERVICE)
                         SVC_TYPE=$(yq eval '.spec.type' $KUBE_SERVICE)
-                        kubectl apply -f $KUBE_SERVICE -n $NAMESPACE
-                        kubectl patch svc "$SVC_NAME" -n "$NAMESPACE" --type=merge -p '{"spec":{"type":"'"$SVC_TYPE"'"}}'
+                        echo "Service name: $SVC_NAME"
+                        echo "Namespace: $NAMESPACE"
+                        echo "Service type from YAML: $SVC_TYPE"
+
+                        # Check existing service type and recreate if needed
+                        EXISTING_TYPE=$(kubectl get svc "$SVC_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.type}' || echo "none")
+                        if [ "$EXISTING_TYPE" != "$SVC_TYPE" ]; then
+                          echo "Service type mismatch: existing=$EXISTING_TYPE, desired=$SVC_TYPE"
+                          kubectl delete svc "$SVC_NAME" -n "$NAMESPACE"
+                          kubectl apply -f "$KUBE_SERVICE" -n "$NAMESPACE"
+                        else
+                          echo "Service type matches. No update needed."
+                        fi
+
                         # Apply ingress dynamically
                         kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
 
