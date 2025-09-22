@@ -41,7 +41,7 @@ pipeline {
                         docker build -t $IMAGE_URI $APP_DIR
                         docker push $IMAGE_URI
                     """
-                }
+                } 
             }
         }
 
