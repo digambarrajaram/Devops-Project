@@ -45,37 +45,18 @@ pipeline {
             }
         }
 
-        stage('Deploy to EKS') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                    sh "aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name eks-cluster"
+      stage('Deploy to Kubernetes') {
+                steps {
+                    echo "Applying Kubernetes manifests..."
+                    sh "kubectl apply -f k8s-deployment.yaml"
+                    sh "kubectl apply -f k8s-service.yaml"
+                    sh "kubectl apply -f k8s-ingress.yaml"
 
-                    // Use `script` block for better Groovy variable handling and cleaner code.
-                    script {
-                        def namespace = sh(script: "yq e '.metadata.namespace' ${KUBE_DEPLOYMENT}", returnStdout: true).trim()
-                        if (namespace == '') {
-                            namespace = "default"
-                        }
-                        sh "kubectl get namespace ${namespace} || kubectl create namespace ${namespace}"
-
-                        // Update deployment image dynamically with yq
-                        sh "yq e -i '.spec.template.spec.containers[0].image = \"${IMAGE_URI}\"' ${KUBE_DEPLOYMENT}"
-                        sh "kubectl apply -f ${KUBE_DEPLOYMENT} -n ${namespace}"
-
-                        // Apply the service directly. `kubectl apply` handles type changes.
-                        sh "kubectl apply -f ClusterIP -n ${namespace}"
-
-                        // Apply ingress dynamically
-                        sh "kubectl apply -f ${KUBE_INGRESS} -n ${namespace}"
-
-                        // Wait for deployment rollout
-                        def deployName = sh(script: "yq e '.metadata.name' ${KUBE_DEPLOYMENT}", returnStdout: true).trim()
-                        sh "kubectl rollout status deployment/${deployName} -n ${namespace}"
-                    }
+                    // You can add a rollout status check to wait for deployment completion
+                    sh "kubectl rollout status deployment/your-app-deployment"
                 }
             }
         }
-}
         post {
             always {
                 echo "Pipeline completed."
