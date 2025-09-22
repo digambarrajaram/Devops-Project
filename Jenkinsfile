@@ -5,7 +5,7 @@ pipeline {
         ECR_REPO = "application_docker_repo"
         IMAGE_NAME = 'python-app'
         IMAGE_TAG = "latest"
-        APP_DIR = "devops-project/python-app"
+        APP_DIR = "devops-project/python-app/"
         ECR_REGISTRY = '605134452604.dkr.ecr.ap-south-1.amazonaws.com'
         IMAGE_URI = "${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}"
     }
