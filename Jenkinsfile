@@ -48,9 +48,9 @@ pipeline {
       stage('Deploy to Kubernetes') {
                 steps {
                     echo "Applying Kubernetes manifests..."
-                    sh "kubectl apply -f k8s-deployment.yaml"
-                    sh "kubectl apply -f k8s-service.yaml"
-                    sh "kubectl apply -f k8s-ingress.yaml"
+                    sh "kubectl apply -f python-app/k8s-deployment.yaml"
+                    sh "kubectl apply -f python-app/k8s-service.yaml"
+                    sh "kubectl apply -f python-app/k8s-ingress.yaml"
 
                     // You can add a rollout status check to wait for deployment completion
                     sh "kubectl rollout status deployment/your-app-deployment"
