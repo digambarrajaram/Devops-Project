@@ -48,47 +48,57 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                    sh '''
-                        # Update kubeconfig
-                        aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
+                    script {
+                        // Update kubeconfig for EKS
+                        sh "aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster"
 
-                        # Extract namespace from deployment YAML
-                        NAMESPACE=$(yq eval '.metadata.namespace' $KUBE_DEPLOYMENT)
-                        [ -z "$NAMESPACE" ] && NAMESPACE="default"
-                        kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+                        // Define temporary file paths for modified manifests
+                        def kubeDeploymentFile = "$KUBE_DEPLOYMENT"
+                        def kubeServiceFile = "$KUBE_SERVICE"
+                        def kubeIngressFile = "$KUBE_INGRESS"
 
-                        # Update deployment image dynamically
-                        sed -i "s|image:.*|image: $IMAGE_URI|" $KUBE_DEPLOYMENT
-                        kubectl apply -f $KUBE_DEPLOYMENT -n $NAMESPACE
+                        // Read deployment and service YAMLs into Groovy objects
+                        def deployYaml = readYaml(file: kubeDeploymentFile)
+                        def serviceYaml = readYaml(file: kubeServiceFile)
 
-                        # Extract service name and type from YAML dynamically
-                        SVC_NAME=$(yq eval '.metadata.name' $KUBE_SERVICE)
-                        SVC_TYPE=$(yq eval '.spec.type' $KUBE_SERVICE)
-                        echo "Service name: $SVC_NAME"
-                        echo "Namespace: $NAMESPACE"
-                        echo "Service type from YAML: $SVC_TYPE"
+                        // Get namespace from deployment YAML, or use 'default' if not present
+                        def namespace = deployYaml.metadata.namespace ?: 'default'
+                        sh "kubectl get namespace ${namespace} || kubectl create namespace ${namespace}"
 
-                        # Check existing service type and recreate if needed
-                        EXISTING_TYPE=$(kubectl get svc "$SVC_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.type}' || echo "none")
-                        if [ "$EXISTING_TYPE" != "$SVC_TYPE" ]; then
-                          echo "Service type mismatch: existing=$EXISTING_TYPE, desired=$SVC_TYPE"
-                          kubectl delete svc "$SVC_NAME" -n "$NAMESPACE"
-                          kubectl apply -f "$KUBE_SERVICE" -n "$NAMESPACE"
-                        else
-                          echo "Service type matches. No update needed."
-                        fi
+                        // Update deployment image dynamically
+                        deployYaml.spec.template.spec.containers[0].image = "$IMAGE_URI"
 
-                        # Apply ingress dynamically
-                        kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
+                        // Get the service type from the YAML for logging and other steps
+                        def svcType = serviceYaml.spec.type
+                        def svcName = serviceYaml.metadata.name
+                        echo "Service name: ${svcName}"
+                        echo "Namespace: ${namespace}"
+                        echo "Service type from YAML: ${svcType}"
 
-                        # Wait for deployment rollout
-                        DEPLOY_NAME=$(yq eval '.metadata.name' $KUBE_DEPLOYMENT)
-                        kubectl rollout status deployment/$DEPLOY_NAME -n $NAMESPACE
-                    '''
+                        // Write the modified deployment back to a temporary file
+                        def modifiedDeploymentFile = "updated-deployment.yaml"
+                        writeYaml(file: modifiedDeploymentFile, data: deployYaml)
+
+                        // Write the modified service back to a temporary file (no change, just for consistency)
+                        def modifiedServiceFile = "updated-service.yaml"
+                        writeYaml(file: modifiedServiceFile, data: serviceYaml)
+
+                        // Apply manifests
+                        sh "kubectl apply -f ${modifiedDeploymentFile} -n ${namespace}"
+                        sh "kubectl apply -f ${modifiedServiceFile} -n ${namespace}"
+                        sh "kubectl apply -f ${kubeIngressFile} -n ${namespace}"
+
+                        // Wait for deployment rollout
+                        def deployName = deployYaml.metadata.name
+                        sh "kubectl rollout status deployment/${deployName} -n ${namespace}"
+
+                        // Clean up temporary files
+                        sh "rm ${modifiedDeploymentFile}"
+                        sh "rm ${modifiedServiceFile}"
+                    }
                 }
             }
         }
-    }
 
     post {
         always {
