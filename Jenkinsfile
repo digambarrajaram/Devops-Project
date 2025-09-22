@@ -48,29 +48,26 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                    sh """
-                        # Update kubeconfig
-                        aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
+                  sh '''
+                                  aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
 
-                        # Ensure namespace exists
-                        kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+                                  # Ensure namespace exists
+                                  kubectl get namespace devops-app || kubectl create namespace devops-app
 
-                        # Update deployment YAML with new image
-                        sed -i "s|image:.*|image: $IMAGE_URI|" $KUBE_DEPLOYMENT
+                                  # Update deployment with latest image
+                                  sed -i "s|image:.*|image: $IMAGE_URI|" $KUBE_DEPLOYMENT
+                                  kubectl apply -f $KUBE_DEPLOYMENT -n devops-app
 
-                        # Apply deployment
-                        kubectl apply -f $KUBE_DEPLOYMENT -n $NAMESPACE
+                                  # Delete and recreate service to apply type change
+                                  kubectl delete svc flask-service -n devops-app || true
+                                  kubectl apply -f $KUBE_SERVICE -n devops-app
 
-                        # Delete Service if exists (to handle immutable type)
-                        kubectl get svc flask-service -n $NAMESPACE && kubectl delete svc flask-service -n $NAMESPACE || true
-                        kubectl apply -f $KUBE_SERVICE -n $NAMESPACE
+                                  # Apply ingress
+                                  kubectl apply -f $KUBE_INGRESS -n devops-app
 
-                        # Apply ingress
-                        kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
-
-                        # Wait for deployment rollout
-                        kubectl rollout status deployment/python-app-deployment -n $NAMESPACE
-                    """
+                                  # Wait for deployment to be ready
+                                  kubectl rollout status deployment/python-app-deployment -n devops-app
+                              '''
                 }
             }
         }
