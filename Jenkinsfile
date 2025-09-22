@@ -48,74 +48,52 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                    script {
-                        // Update kubeconfig for EKS
-                        sh "aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster"
+                    sh '''
+                        # Ensure yq is available in the shell environment.
+                        # If not, you may need to install it with:
+                        # pip install yq
+                        # or wget and move the binary to your PATH.
+                        # For example:
+                        # wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+                        # chmod +x /usr/local/bin/yq
 
-                        // Define file paths
-                        def kubeDeploymentFile = "$KUBE_DEPLOYMENT"
-                        def kubeServiceFile = "$KUBE_SERVICE"
-                        def kubeIngressFile = "$KUBE_INGRESS"
+                        # Update kubeconfig
+                        aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
 
-                        // Read YAMLs
-                        def deployYaml = readYaml(file: kubeDeploymentFile)
-                        def serviceYaml = readYaml(file: kubeServiceFile)
+                        # Extract namespace from deployment YAML
+                        NAMESPACE=$(yq e '.metadata.namespace' $KUBE_DEPLOYMENT)
+                        [ -z "$NAMESPACE" ] && NAMESPACE="default"
+                        kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
-                        // Extract namespace
-                        def namespace = deployYaml.metadata.namespace ?: 'default'
-                        sh "kubectl get namespace ${namespace} || kubectl create namespace ${namespace}"
+                        # Update deployment image dynamically
+                        yq e -i ".spec.template.spec.containers[0].image = \"$IMAGE_URI\"" $KUBE_DEPLOYMENT
+                        kubectl apply -f $KUBE_DEPLOYMENT -n $NAMESPACE
 
-                        // Update deployment image
-                        deployYaml.spec.template.spec.containers[0].image = "$IMAGE_URI"
+                        # Extract service name and type from YAML dynamically
+                        SVC_NAME=$(yq e '.metadata.name' $KUBE_SERVICE)
+                        SVC_TYPE=$(yq e '.spec.type' $KUBE_SERVICE)
+                        echo "Service name: $SVC_NAME"
+                        echo "Namespace: $NAMESPACE"
+                        echo "Service type from YAML: $SVC_TYPE"
 
-                        // Extract service name and type
-                        def svcName = serviceYaml.metadata.name
-                        def svcType = serviceYaml.spec.type
-                        echo "Service name: ${svcName}"
-                        echo "Namespace: ${namespace}"
-                        echo "Service type from YAML: ${svcType}"
+                        # Check existing service type and recreate if needed
+                        EXISTING_TYPE=$(kubectl get svc "$SVC_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
 
-                        // Write updated deployment YAML
-                        def modifiedDeploymentFile = "updated-deployment.yaml"
-                        writeYaml(file: modifiedDeploymentFile, data: deployYaml)
+                        # The `kubectl apply` command will handle the update correctly,
+                        # including the service type change, without needing to delete and recreate.
+                        # We can remove the if/else block to simplify the logic.
+                        kubectl apply -f "$KUBE_SERVICE" -n "$NAMESPACE"
 
-                        // Write service YAML (unchanged)
-                        def modifiedServiceFile = "updated-service.yaml"
-                        writeYaml(file: modifiedServiceFile, data: serviceYaml)
+                        # Apply ingress dynamically
+                        kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
 
-                        // Apply deployment
-                        sh "kubectl apply -f ${modifiedDeploymentFile} -n ${namespace}"
-
-                        // Check existing service type and recreate if needed
-                        def existingType = sh(
-                            script: "kubectl get svc ${svcName} -n ${namespace} -o jsonpath='{.spec.type}' || echo none",
-                            returnStdout: true
-                        ).trim()
-
-                        if (existingType != svcType) {
-                            echo "Service type mismatch: existing=${existingType}, desired=${svcType}"
-                            sh "kubectl delete svc ${svcName} -n ${namespace}"
-                            sh "kubectl apply -f ${modifiedServiceFile} -n ${namespace}"
-                        } else {
-                            echo "Service type matches. No update needed."
-                            sh "kubectl apply -f ${modifiedServiceFile} -n ${namespace}"
-                        }
-
-                        // Apply ingress
-                        sh "kubectl apply -f ${kubeIngressFile} -n ${namespace}"
-
-                        // Wait for rollout
-                        def deployName = deployYaml.metadata.name
-                        sh "kubectl rollout status deployment/${deployName} -n ${namespace}"
-
-                        // Clean up
-                        sh "rm ${modifiedDeploymentFile}"
-                        sh "rm ${modifiedServiceFile}"
-                    }
+                        # Wait for deployment rollout
+                        DEPLOY_NAME=$(yq e '.metadata.name' $KUBE_DEPLOYMENT)
+                        kubectl rollout status deployment/$DEPLOY_NAME -n $NAMESPACE
+                    '''
                 }
             }
         }
-    }
 
     post {
         always {
