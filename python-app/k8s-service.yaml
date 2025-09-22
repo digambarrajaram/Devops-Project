@@ -1,31 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: python-app-service
+  name: flask-service
+  namespace: devops-app
+  labels:
+    app: flask-app
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
-    app: python-app
+    app: flask-app
   ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 5000
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: python-app-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-    - host: python-app.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: python-app-service
-                port:
-                  number: 80
+    - port: 80
+      targetPort: 5000   # Flask default port
+      protocol: TCP
