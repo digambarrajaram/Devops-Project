@@ -4,7 +4,7 @@ metadata:
   name: flask-service
   namespace: devops-app
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: python-app
   ports:
