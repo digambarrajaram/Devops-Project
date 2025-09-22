@@ -1,8 +1,5 @@
 pipeline {
     agent any
-        docker {
-                image 'python:3.9-slim'
-            }
     environment {
         AWS_DEFAULT_REGION = "ap-south-1"
         ECR_REPO = "application_docker_repo"
@@ -22,9 +19,9 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.build("${IMAGE_URI}", "${APP_DIR}")
-                }
+                sh '''
+                    docker build -t $IMAGE_URI $APP_DIR
+                '''
             }
         }
 
@@ -41,9 +38,9 @@ pipeline {
 
         stage('Push to ECR') {
             steps {
-                script {
-                    docker.image("${IMAGE_URI}").push()
-                }
+                sh '''
+                    docker push $IMAGE_URI
+                '''
             }
         }
     }
