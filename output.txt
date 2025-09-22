@@ -1,9 +1,9 @@
-JENKINS_IP : 13.233.215.78
+JENKINS_IP : 3.6.126.125
 Bucket_Name : backend-terraform-state-bucket-for-vpc-and-eks
 EKS Cluster Name: eks-cluster
 EKS Cluster ARN: arn:aws:eks:ap-south-1:605134452604:cluster/eks-cluster
-VPC ID: vpc-0be3db21fca6db565
-Jenkins Password: fbfc6f31daa5417ba1f936aef1de4f43"
+VPC ID: vpc-0bd5b1b1af6f3f99e
+Jenkins Password: 
 ecr_repo_name: application_docker_repo
 ecr_repo_url: 605134452604.dkr.ecr.ap-south-1.amazonaws.com/application_docker_repo
 ecr_repo_arn: arn:aws:ecr:ap-south-1:605134452604:repository/application_docker_repo

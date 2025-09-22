@@ -2,11 +2,13 @@ pipeline {
     agent any
 
     environment {
-        registryCredential = 'ecr:ap-south-1:awscred'
         AWS_DEFAULT_REGION = "ap-south-1"
-        ECR_REPO = "605134452604.dkr.ecr.ap-south-1.amazonaws.com/application_docker_repo"
+        ECR_REPO = "application_docker_repo"
+        IMAGE_NAME = 'python-app'
         IMAGE_TAG = "latest"
         APP_DIR = "devops-project/python-app"
+        ECR_REGISTRY = '605134452604.dkr.ecr.ap-south-1.amazonaws.com'
+        IMAGE_URI = "${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}"
     }
 
     stages {
@@ -19,36 +21,34 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dir('Docker-files/app/multistage') {
-                        withAWS(credentials: 'awscreds', region: "${AWS_DEFAULT_REGION}") {
-                            sh """
-                                aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPO}
-                                docker build -t ${ECR_REPO}:${IMAGE_TAG} .
-                            """
-                        }
-                    }
+                    docker.build("${IMAGE_URI}", "${APP_DIR}")
+                }
+            }
+        }
+
+        stage('Login to ECR') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
+                    sh '''
+                        aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
+                        docker login --username AWS --password-stdin $ECR_REGISTRY
+                    '''
                 }
             }
         }
 
         stage('Push to ECR') {
             steps {
-                sh "docker push ${ECR_REPO}:${IMAGE_TAG}"
-            }
-        }
-
-        stage('Deploy to EKS') {
-            steps {
                 script {
-                    dir(APP_DIR) {
-                        sh """
-                            kubectl set image deployment/flask-app flask-container=${ECR_REPO}:${IMAGE_TAG} --record || \
-                            kubectl apply -f k8s-deployment.yaml
-                            kubectl apply -f k8s-service.yaml
-                        """
-                    }
+                    docker.image("${IMAGE_URI}").push()
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline completed.'
         }
     }
 }
