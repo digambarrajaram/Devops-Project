@@ -10,7 +10,6 @@ pipeline {
         KUBE_DEPLOYMENT = "python-app/k8s-deployment.yaml"
         KUBE_SERVICE = "python-app/k8s-service.yaml"
         KUBE_INGRESS = "python-app/k8s-ingress.yaml"
-        NAMESPACE = "devops-app"
     }
 
     stages {
@@ -27,6 +26,7 @@ pipeline {
                     IMAGE_URI = "${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}"
                     env.IMAGE_TAG = IMAGE_TAG
                     env.IMAGE_URI = IMAGE_URI
+                    echo "Image URI set to: $IMAGE_URI"
                 }
             }
         }
@@ -48,26 +48,32 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                  sh '''
-                                  aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
+                    sh '''
+                        # Update kubeconfig
+                        aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
 
-                                  # Ensure namespace exists
-                                  kubectl get namespace devops-app || kubectl create namespace devops-app
+                        # Extract namespace from deployment YAML
+                        NAMESPACE=$(yq eval '.metadata.namespace' $KUBE_DEPLOYMENT)
+                        [ -z "$NAMESPACE" ] && NAMESPACE="default"
+                        kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
 
-                                  # Update deployment with latest image
-                                  sed -i "s|image:.*|image: $IMAGE_URI|" $KUBE_DEPLOYMENT
-                                  kubectl apply -f $KUBE_DEPLOYMENT -n devops-app
+                        # Update deployment image dynamically
+                        sed -i "s|image:.*|image: $IMAGE_URI|" $KUBE_DEPLOYMENT
+                        kubectl apply -f $KUBE_DEPLOYMENT -n $NAMESPACE
 
-                                  # Delete and recreate service to apply type change
-                                  kubectl delete svc flask-service -n devops-app || true
-                                  kubectl apply -f $KUBE_SERVICE -n devops-app
+                        # Extract service name and type from YAML dynamically
+                        SVC_NAME=$(yq eval '.metadata.name' $KUBE_SERVICE)
+                        SVC_TYPE=$(yq eval '.spec.type' $KUBE_SERVICE)
+                        kubectl apply -f $KUBE_SERVICE -n $NAMESPACE
+                        kubectl patch svc $SVC_NAME -n $NAMESPACE -p "{\"spec\":{\"type\":\"$SVC_TYPE\"}}"
 
-                                  # Apply ingress
-                                  kubectl apply -f $KUBE_INGRESS -n devops-app
+                        # Apply ingress dynamically
+                        kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
 
-                                  # Wait for deployment to be ready
-                                  kubectl rollout status deployment/python-app-deployment -n devops-app
-                              '''
+                        # Wait for deployment rollout
+                        DEPLOY_NAME=$(yq eval '.metadata.name' $KUBE_DEPLOYMENT)
+                        kubectl rollout status deployment/$DEPLOY_NAME -n $NAMESPACE
+                    '''
                 }
             }
         }
