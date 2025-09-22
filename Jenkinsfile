@@ -11,7 +11,6 @@ pipeline {
         KUBE_SERVICE = "python-app/k8s-service.yaml"
         KUBE_INGRESS = "python-app/k8s-ingress.yaml"
     }
-
     stages {
         stage('Checkout') {
             steps {
