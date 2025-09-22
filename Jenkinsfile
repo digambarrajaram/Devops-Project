@@ -66,7 +66,6 @@ pipeline {
                         SVC_TYPE=$(yq eval '.spec.type' $KUBE_SERVICE)
                         kubectl apply -f $KUBE_SERVICE -n $NAMESPACE
                         kubectl patch svc $SVC_NAME -n $NAMESPACE -p "{\"spec\":{\"type\":\"$SVC_TYPE\"}}"
-
                         # Apply ingress dynamically
                         kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
 
