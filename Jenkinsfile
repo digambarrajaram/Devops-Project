@@ -41,7 +41,7 @@ pipeline {
             steps {
                 script {
                     docker.image("${IMAGE_URI}").push()
-                }
+                } 
             }
         }
     }
