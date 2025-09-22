@@ -35,11 +35,11 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
                     sh """
-                        aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
-                        docker login --username AWS --password-stdin $ECR_REGISTRY
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | \
+                        docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
-                        docker build -t $IMAGE_URI $APP_DIR
-                        docker push $IMAGE_URI
+                        docker build -t ${IMAGE_URI} ${APP_DIR}
+                        docker push ${IMAGE_URI}
                     """
                 }
             }
@@ -48,56 +48,38 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'awscred']]) {
-                    sh '''
-                        # Ensure yq is available in the shell environment.
-                        # If not, you may need to install it with:
-                        # pip install yq
-                        # or wget and move the binary to your PATH.
-                        # For example:
-                        # wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
-                        # chmod +x /usr/local/bin/yq
+                    sh "aws eks update-kubeconfig --region ${AWS_DEFAULT_REGION} --name eks-cluster"
 
-                        # Update kubeconfig
-                        aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name eks-cluster
+                    // Use `script` block for better Groovy variable handling and cleaner code.
+                    script {
+                        def namespace = sh(script: "yq e '.metadata.namespace' ${KUBE_DEPLOYMENT}", returnStdout: true).trim()
+                        if (namespace == '') {
+                            namespace = "default"
+                        }
+                        sh "kubectl get namespace ${namespace} || kubectl create namespace ${namespace}"
 
-                        # Extract namespace from deployment YAML
-                        NAMESPACE=$(yq e '.metadata.namespace' $KUBE_DEPLOYMENT)
-                        [ -z "$NAMESPACE" ] && NAMESPACE="default"
-                        kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+                        // Update deployment image dynamically with yq
+                        sh "yq e -i '.spec.template.spec.containers[0].image = \"${IMAGE_URI}\"' ${KUBE_DEPLOYMENT}"
+                        sh "kubectl apply -f ${KUBE_DEPLOYMENT} -n ${namespace}"
 
-                        # Update deployment image dynamically
-                        yq e -i ".spec.template.spec.containers[0].image = \"$IMAGE_URI\"" $KUBE_DEPLOYMENT
-                        kubectl apply -f $KUBE_DEPLOYMENT -n $NAMESPACE
+                        // Apply the service directly. `kubectl apply` handles type changes.
+                        sh "kubectl apply -f ${KUBE_SERVICE} -n ${namespace}"
 
-                        # Extract service name and type from YAML dynamically
-                        SVC_NAME=$(yq e '.metadata.name' $KUBE_SERVICE)
-                        SVC_TYPE=$(yq e '.spec.type' $KUBE_SERVICE)
-                        echo "Service name: $SVC_NAME"
-                        echo "Namespace: $NAMESPACE"
-                        echo "Service type from YAML: $SVC_TYPE"
+                        // Apply ingress dynamically
+                        sh "kubectl apply -f ${KUBE_INGRESS} -n ${namespace}"
 
-                        # Check existing service type and recreate if needed
-                        EXISTING_TYPE=$(kubectl get svc "$SVC_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
-
-                        # The `kubectl apply` command will handle the update correctly,
-                        # including the service type change, without needing to delete and recreate.
-                        # We can remove the if/else block to simplify the logic.
-                        kubectl apply -f "$KUBE_SERVICE" -n "$NAMESPACE"
-
-                        # Apply ingress dynamically
-                        kubectl apply -f $KUBE_INGRESS -n $NAMESPACE
-
-                        # Wait for deployment rollout
-                        DEPLOY_NAME=$(yq e '.metadata.name' $KUBE_DEPLOYMENT)
-                        kubectl rollout status deployment/$DEPLOY_NAME -n $NAMESPACE
-                    '''
+                        // Wait for deployment rollout
+                        def deployName = sh(script: "yq e '.metadata.name' ${KUBE_DEPLOYMENT}", returnStdout: true).trim()
+                        sh "kubectl rollout status deployment/${deployName} -n ${namespace}"
+                    }
                 }
             }
         }
 
-    post {
-        always {
-            echo "Pipeline completed."
+        post {
+            always {
+                echo "Pipeline completed."
+            }
         }
     }
 }
