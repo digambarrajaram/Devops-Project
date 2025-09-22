@@ -1,15 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: python-app-ingress
+  name: flask-service
   namespace: devops-app
-  labels:
-    app: flask-app
 spec:
   type: ClusterIP
   selector:
-    app: flask-app
+    app: python-app
   ports:
-    - port: 80
-      targetPort: 5000   # Flask default port
-      protocol: TCP
+    - protocol: TCP
+      port: 80
+      targetPort: 5000

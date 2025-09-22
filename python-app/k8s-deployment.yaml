@@ -14,7 +14,7 @@ spec:
         app: python-app
     spec:
       containers:
-        - name: python-app
-          image: <replace-later>
+        - name: flask-container
+          image: 605134452604.dkr.ecr.ap-south-1.amazonaws.com/application_docker_repo:latest
           ports:
             - containerPort: 5000
